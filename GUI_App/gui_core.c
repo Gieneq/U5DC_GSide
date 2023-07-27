@@ -1,18 +1,20 @@
+#include "lcd_dsi.h"
 #include "gui_core.h"
-#include "graphics.h"
+#include "gfx.h"
 #include <stdbool.h>
 #include "microtimer.h"
 #include "main.h"
 
+static microtimer_simple_t gui_microtimer_performance;
 static TX_THREAD gui_thread;
 
 static void gui_thread_entry();
 
-extern void gui_init();
-extern void gui_tick();
+extern void gui_init(gfx_ctrl_t* gfx);
+extern void gui_tick(gfx_ctrl_t* gfx);
 
 TX_SEMAPHORE vsync_semaphore;
-
+static gfx_ctrl_t gfx;
 
 void on_vsync() {
 	tx_semaphore_put(&vsync_semaphore);
@@ -34,7 +36,14 @@ UINT gui_core_thread_create(TX_BYTE_POOL *byte_pool) {
 		return TX_SEMAPHORE_ERROR;
 	}
 
-	gfx_set_vsync_ctrl(on_vsync, wait_until_vsync);
+
+	/* Connect drawing API with low level driver */
+	lcd_dsi_set_vsync_ctrl(on_vsync, wait_until_vsync);
+	gfx.clearscreen        = lcd_dsi_clearscreen;
+	gfx.gfx_draw_bitmap    = lcd_dsi_draw_bitmap_blocking;
+	gfx.gfx_draw_fillrect  = lcd_dsi_draw_fillrect;
+	gfx.gfx_draw_hline     = lcd_dsi_draw_hline;
+	gfx.gfx_draw_vline     = lcd_dsi_draw_vline;
 
 	/* Allocate the stack for the thread  */
 	ret = tx_byte_allocate(byte_pool, (VOID**) &pointer, GUI_THREAD_STACK_SIZE, TX_NO_WAIT);
@@ -61,17 +70,15 @@ UINT gui_core_thread_create(TX_BYTE_POOL *byte_pool) {
 	return ret;
 }
 
-static microtimer_simple_t gui_microtimer_refresh;
 
 static void gui_thread_entry() {
-	gui_init();
-	microtimer_simple_init(&gui_microtimer_refresh);
+	gui_init(&gfx);
+	microtimer_simple_init(&gui_microtimer_performance);
 	while(1) {
-		gfx_wait_until_vsync();
-		microtimer_simple_start(&gui_microtimer_refresh);
-		gfx_clearscreen(0xFFffff00);
-		gui_tick();
-		microtimer_simple_stop(&gui_microtimer_refresh);
+		lcd_dsi_wait_until_vsync();
+		microtimer_simple_start(&gui_microtimer_performance);
+		gui_tick(&gfx);
+		microtimer_simple_stop(&gui_microtimer_performance);
 	}
 }
 

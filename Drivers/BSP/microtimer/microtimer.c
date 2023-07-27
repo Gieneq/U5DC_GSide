@@ -73,7 +73,7 @@ void microtimer_simple_start(microtimer_simple_t* mts) {
 	mts->_vars.start_time_us = current_us;
 }
 
-uint32_t microtimer_simple_stop(microtimer_simple_t* mts) {
+void microtimer_simple_stop(microtimer_simple_t* mts) {
 	mts->_vars.stop_time_us = microtimer_get_us();
 	if(mts->interval_us <= 0) {
 		mts->duty_perc = 100.0F;

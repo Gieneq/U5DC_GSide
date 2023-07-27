@@ -33,7 +33,7 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
-#include "graphics.h"
+#include "lcd_dsi.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -43,8 +43,8 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-extern uint32_t lcd_framebuffer0[LCD_FRAMEBUFFER0_SIZE];
-extern uint32_t lcd_framebuffer1[LCD_FRAMEBUFFER1_SIZE];
+extern uint32_t lcd_dsi_framebuffer0[LCD_DSI_FRAMEBUFFER0_SIZE];
+extern uint32_t lcd_dsi_framebuffer1[LCD_DSI_FRAMEBUFFER1_SIZE];
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -61,7 +61,7 @@ void Error_Handler(void);
 
 /* Private defines -----------------------------------------------------------*/
 #define VFP 50
-#define PHY0_ADDRESS ((uint32_t) lcd_framebuffer0)
+#define PHY0_ADDRESS ((uint32_t) lcd_dsi_framebuffer0)
 #define PIXEL_PERLINE 768
 #define LCD_WIDTH 480
 #define VBP 12
@@ -73,7 +73,7 @@ void Error_Handler(void);
 #define HBP 1
 #define LCD_HEIGHT 481
 #define HSYNC 2
-#define PHY1_ADDRESS ((uint32_t) lcd_framebuffer1)
+#define PHY1_ADDRESS ((uint32_t) lcd_dsi_framebuffer1)
 #define LED_GREEN_Pin GPIO_PIN_0
 #define LED_GREEN_GPIO_Port GPIOE
 #define LED_RED_Pin GPIO_PIN_1

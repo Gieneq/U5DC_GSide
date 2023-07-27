@@ -1,8 +1,7 @@
-#include "graphics.h"
+#include <lcd_dsi.h>
 #include "main.h"
 #include "ltdc.h"
 #include "dsihost.h"
-#include "color_pallete.h"
 #include "microtimer.h"
 #include "gfxmmu.h"
 #include "dma2d.h"
@@ -46,8 +45,8 @@ static uint32_t back_buffer_address = GFXMMU_VIRTUAL_BUFFER1_BASE;
 //#endif
 //ALIGN_32BYTES (uint32_t   lcd_framebuffer0[184320]);
 
-uint32_t lcd_framebuffer0[LCD_FRAMEBUFFER0_SIZE];
-uint32_t lcd_framebuffer1[LCD_FRAMEBUFFER1_SIZE];
+uint32_t lcd_dsi_framebuffer0[LCD_DSI_FRAMEBUFFER0_SIZE];
+uint32_t lcd_dsi_framebuffer1[LCD_DSI_FRAMEBUFFER1_SIZE];
 
 #define LOCATION_FRONTPORCH 12
 #define LOCATION_BACKPORCH  (480 + 2)
@@ -61,7 +60,7 @@ static wait_until_vsync_t wait_until_vsync_handle;
 #define IS_EXTERNAL_VSYNC_CTRL() (on_vsync_handle && wait_until_vsync_handle)
 
 
-bsp_result_t gfx_init() {
+bsp_result_t lcd_dsi_init() {
 	if(SetPanelConfig() != 0) {
 		return BSP_ERROR;
 	}
@@ -220,7 +219,7 @@ static uint32_t SetPanelConfig(void) {
 }
 
 
-void gfx_set_vsync_ctrl(on_vsync_t on_vsync, wait_until_vsync_t wait_until_vsync) {
+void lcd_dsi_set_vsync_ctrl(on_vsync_t on_vsync, wait_until_vsync_t wait_until_vsync) {
 	if(!on_vsync || !wait_until_vsync) {
 		Error_Handler();
 	}
@@ -230,7 +229,7 @@ void gfx_set_vsync_ctrl(on_vsync_t on_vsync, wait_until_vsync_t wait_until_vsync
 }
 
 
-void gfx_draw_fillrect(uint32_t x_pos, uint32_t y_pos, uint32_t width, uint32_t height, uint32_t color) {
+void lcd_dsi_draw_fillrect(uint32_t x_pos, uint32_t y_pos, uint32_t width, uint32_t height, uint32_t color) {
 	DMA2D_FillRectBlocking(color, x_pos, y_pos, width, height);
 }
 
@@ -269,7 +268,7 @@ static void DMA2D_wait_until_finished() {
 	}
 }
 
-void gfx_wait_until_vsync() {
+void lcd_dsi_wait_until_vsync() {
 	if(IS_EXTERNAL_VSYNC_CTRL()) {
 		wait_until_vsync_handle();
 	}
@@ -282,7 +281,7 @@ void gfx_wait_until_vsync() {
 }
 
 
-void gfx_clearscreen(uint32_t color) {
+void lcd_dsi_clearscreen(uint32_t color) {
 	ltdc_clear_sreen_start_us = microtimer_get_us();
 
 	/* Clear screen nonblocking */
@@ -293,7 +292,7 @@ void gfx_clearscreen(uint32_t color) {
 }
 
 
-void gfx_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+void lcd_dsi_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
 	uint32_t destination = back_buffer_address + (y * PIXEL_PERLINE + x) * 4;
 	uint32_t source      = (uint32_t)pSrc;
 
@@ -339,7 +338,7 @@ void gfx_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t w
 
 }
 
-void gfx_draw_hline(uint32_t x1, uint32_t x2, uint32_t y, uint32_t color) {
+void lcd_dsi_draw_hline(uint32_t x1, uint32_t x2, uint32_t y, uint32_t color) {
 	if(x1 > x2) {
 		return;
 	}
@@ -349,7 +348,7 @@ void gfx_draw_hline(uint32_t x1, uint32_t x2, uint32_t y, uint32_t color) {
 	}
 }
 
-void gfx_draw_vline(uint32_t y1, uint32_t y2, uint32_t x, uint32_t color) {
+void lcd_dsi_draw_vline(uint32_t y1, uint32_t y2, uint32_t x, uint32_t color) {
 	if(y1 > y2) {
 		return;
 	}

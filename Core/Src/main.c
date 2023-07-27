@@ -34,10 +34,7 @@
 #include "bsp.h"
 #include "microtimer.h"
 #include "status_led.h"
-#include "graphics.h"
 #include "my_stts22h.h"
-#include "balls_simulation.h"
-#include "graphics_res.h"
 #include <stdbool.h>
 /* USER CODE END Includes */
 
@@ -121,10 +118,6 @@ int main(void)
 	  Error_Handler();
   }
   printf("BSP created successfully!\n");
-//
-//  graphics_res_init();
-
-//  balls_simulation_init();
 
   /* USER CODE END 2 */
 
@@ -133,53 +126,8 @@ int main(void)
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-//  float time_sec = 0;
-//  float delta_time_sec = 0;
-//  uint32_t last_us = microtimer_get_us();
-//  uint32_t current_us = microtimer_get_us();
-
-//#define START_SIM_WARMUP_DELAY 1.0F
-//  float start_sim_warmup = 0;
   while (1)
   {
-//	  microperformance_start_idle();
-//	  gfx_wait_until_vsync();
-//
-//	  /* Start nonblocking clear and update in meantime */
-//	  microperformance_start_update();
-//	  gfx_start_clearscreen();
-//	  /* Place for some update logic */
-//	  {
-//		  current_us = microtimer_get_us();
-//		  delta_time_sec = (current_us - last_us) / 1000000.0F;
-//		  time_sec += delta_time_sec;
-//		  last_us = current_us;
-//		  bsp_update();
-//
-//		  if(start_sim_warmup > START_SIM_WARMUP_DELAY) {
-//			  if(should_gen_new_ball == true) {
-//				  should_gen_new_ball = false;
-//				  balls_simulation_generate_ball();
-//			  }
-//			  balls_simulation_update(time_sec, delta_time_sec);
-//		  } else {
-//			  start_sim_warmup += delta_time_sec;
-//		  }
-//	  }
-//	  microperformance_end_update();
-//
-//	  gfx_wait_until_clearscreen();
-//	  microperformance_start_draw();
-//	  /* Place for some drawing */
-//	  {
-////		  draw_test();
-//		  if(start_sim_warmup > START_SIM_WARMUP_DELAY) {
-//			  balls_simulation_draw();
-//		  }
-//	  }
-//	  gfx_finish();
-//	  microperformance_end_loop();
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -311,52 +259,6 @@ int __io_putchar(int ch)
 
   return 1;
 }
-
-
-
-//static float radius = 140;
-//static float cx = LCD_WIDTH/2;
-//static float cy = LCD_HEIGHT/2;
-//static uint32_t size = 50;
-//static float freq = 0.5F;
-//static float t = 0;
-//static int white_v_idx = 1;
-//static int white_h_idx = -1;
-
-
-//static void draw_test() {
-//	/* Blue */
-//	t += REFRESH_INTERVAL_US/1000000.0F;
-//	{
-//		uint32_t sq_xy = (uint32_t)(cx + radius * sinf(2.0F*3.1415F*freq*t)) - size/2;
-//		gfx_draw_fillrect(sq_xy, sq_xy, size, size, 0xff0000ff);
-//	}
-//
-//	/* Magenta */
-//	{
-//		uint32_t sq_xy = (uint32_t)(cx - radius * sin(2.0F*3.1415F*freq*t)) - size/2;
-//		gfx_draw_fillrect(sq_xy, sq_xy, size, size, 0xffff00ff);
-//	}
-//
-//	/* Red */
-//	{
-//		uint32_t cq_x = (uint32_t)(cx + radius * sinf(2.0F*3.1415F*freq*t)) - size/2;
-//		uint32_t cq_y = (uint32_t)(cy + radius * cosf(2.0F*3.1415F*freq*t)) - size/2;
-//		gfx_draw_fillrect(cq_x, cq_y, size, size, 0xffff0000);
-//	}
-//
-//	/* Yellow */
-//	{
-//		uint32_t cq_x = (uint32_t)(cx + radius * sinf(-2.0F*3.1415F*freq*t)) - size/2;
-//		uint32_t cq_y = (uint32_t)(cy + radius * cosf(-2.0F*3.1415F*freq*t)) - size/2;
-//		gfx_draw_fillrect(cq_x, cq_y, size, size, 0xffffff00);
-//	}
-//
-//
-//	/* Green */
-//	gfx_draw_fillrect(cx-size/2, cy-size/2, size, size, 0xff00ff00);
-//}
-
 
 
 void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {

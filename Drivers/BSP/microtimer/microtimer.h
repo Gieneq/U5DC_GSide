@@ -23,7 +23,7 @@ uint32_t microtimer_stop();
 
 void microtimer_simple_init(microtimer_simple_t* mts);
 void microtimer_simple_start(microtimer_simple_t* mts);
-uint32_t microtimer_simple_stop(microtimer_simple_t* mts);
+void microtimer_simple_stop(microtimer_simple_t* mts);
 
 void microperformance_start_idle();
 void microperformance_start_update();
