@@ -23,6 +23,7 @@ static void swap_buffers();
 static void on_blanking_event();
 static __IO int can_start_draw = 0;
 
+
 static __IO uint32_t last_ltdc_line_event_us;
 static __IO float ltdc_line_event_frequency_hz;
 static __IO float ltdc_line_event_interval_ms;
@@ -34,10 +35,6 @@ static __IO float ltdc_blanking_period_ms;
 
 static __IO int32_t ltdc_clear_sreen_start_us;
 static __IO int32_t ltdc_clear_sreen_duriation_us;
-//static int line_y_pos = 0;
-
-static __IO uint32_t current_ltdc_x;
-static __IO uint32_t current_ltdc_y;
 
 static uint32_t front_buffer_address = GFXMMU_VIRTUAL_BUFFER0_BASE;
 static uint32_t back_buffer_address = GFXMMU_VIRTUAL_BUFFER1_BASE;
@@ -58,9 +55,13 @@ static uint32_t ltdc_line_current_location = LOCATION_FRONTPORCH;
 
 #define LCD_REFRESH_DIV (2)
 static __IO int lcd_refresh_divider_counter = 0;
-static on_vsync_handle_t on_vsync_handle;
 
-bsp_result_t graphics_init() {
+static on_vsync_t on_vsync_handle;
+static wait_until_vsync_t wait_until_vsync_handle;
+#define IS_EXTERNAL_VSYNC_CTRL() (on_vsync_handle && wait_until_vsync_handle)
+
+
+bsp_result_t gfx_init() {
 	if(SetPanelConfig() != 0) {
 		return BSP_ERROR;
 	}
@@ -91,16 +92,20 @@ static void on_blanking_event() {
 	if(lcd_refresh_divider_counter >= (LCD_REFRESH_DIV - 0)) {
 		lcd_refresh_divider_counter = 0;
 		swap_buffers();
-		can_start_draw = 1;
-		on_vsync_handle();
+
+
+		if(IS_EXTERNAL_VSYNC_CTRL()) {
+			on_vsync_handle();
+		}
+		else {
+			can_start_draw = 1;
+		}
 	}
 }
 
 
 void HAL_LTDC_LineEventCallback(LTDC_HandleTypeDef *hltdc) {
 	/* Finding LTDC location */
-	current_ltdc_y = hltdc->Instance->CPSR & 0xFFFF;
-	current_ltdc_x = (hltdc->Instance->CPSR >> 16) & 0xFFFF;
 
 	if(ltdc_line_current_location == LOCATION_FRONTPORCH) {
 		/* Measure blanking time */
@@ -215,8 +220,13 @@ static uint32_t SetPanelConfig(void) {
 }
 
 
-void gfx_set_on_vsync_listener(on_vsync_handle_t handle) {
-	on_vsync_handle = handle;
+void gfx_set_vsync_ctrl(on_vsync_t on_vsync, wait_until_vsync_t wait_until_vsync) {
+	if(!on_vsync || !wait_until_vsync) {
+		Error_Handler();
+	}
+
+	on_vsync_handle = on_vsync;
+	wait_until_vsync_handle = wait_until_vsync;
 }
 
 
@@ -260,27 +270,26 @@ static void DMA2D_wait_until_finished() {
 }
 
 void gfx_wait_until_vsync() {
-	while(can_start_draw != 1) {
-		;
+	if(IS_EXTERNAL_VSYNC_CTRL()) {
+		wait_until_vsync_handle();
+	}
+	else {
+		while(can_start_draw != 1) {
+			;
+		}
+		can_start_draw = 0;
 	}
 }
 
 
-void gfx_start_clearscreen() {
+void gfx_clearscreen(uint32_t color) {
 	ltdc_clear_sreen_start_us = microtimer_get_us();
 
 	/* Clear screen nonblocking */
-	DMA2D_FillRectNonblocking(0xFF000000, 0, 0, LCD_WIDTH, LCD_HEIGHT);
+	DMA2D_FillRectNonblocking(color, 0, 0, LCD_WIDTH, LCD_HEIGHT);
 
-}
-
-void gfx_wait_until_clearscreen() {
 	DMA2D_wait_until_finished();
 	ltdc_clear_sreen_duriation_us = microtimer_get_us() - ltdc_clear_sreen_start_us;
-}
-
-void gfx_finish() {
-	can_start_draw = 0;
 }
 
 

@@ -44,6 +44,12 @@ bsp_result_t microtimer_init() {
 	return BSP_OK;
 }
 
+uint32_t microtimer_get_us() {
+	return __HAL_TIM_GET_COUNTER(&TIM_MICROTIMER);
+}
+
+
+
 void microtimer_start() {
 	microtimer_last_time = __HAL_TIM_GET_COUNTER(&TIM_MICROTIMER);
 }
@@ -52,8 +58,29 @@ uint32_t microtimer_stop() {
 	return (__HAL_TIM_GET_COUNTER(&TIM_MICROTIMER) - microtimer_last_time);
 }
 
-uint32_t microtimer_get_us() {
-	return __HAL_TIM_GET_COUNTER(&TIM_MICROTIMER);
+
+void microtimer_simple_init(microtimer_simple_t* mts) {
+	mts->duty_perc = 0;
+	mts->interval_us = microtimer_get_us();
+	mts->_vars.start_time_us = 0;
+	mts->_vars.stop_time_us = mts->interval_us;
+}
+
+void microtimer_simple_start(microtimer_simple_t* mts) {
+	uint32_t current_us = microtimer_get_us();
+	mts->interval_us = current_us - mts->_vars.start_time_us;
+	mts->frequency_hz = 1000000.0F / mts->interval_us;
+	mts->_vars.start_time_us = current_us;
+}
+
+uint32_t microtimer_simple_stop(microtimer_simple_t* mts) {
+	mts->_vars.stop_time_us = microtimer_get_us();
+	if(mts->interval_us <= 0) {
+		mts->duty_perc = 100.0F;
+	}
+	else {
+		mts->duty_perc = 100.0F * (mts->_vars.stop_time_us - mts->_vars.start_time_us) / mts->interval_us;
+	}
 }
 
 
