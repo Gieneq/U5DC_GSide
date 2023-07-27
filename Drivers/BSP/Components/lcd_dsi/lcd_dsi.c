@@ -15,12 +15,11 @@ extern DMA2D_HandleTypeDef hdma2d;
 
 static uint32_t SetPanelConfig(void);
 static void DMA2D_FillRectBlocking(uint32_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
-static void DMA2D_FillRectNonblocking(uint32_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+static void DMA2D_DrawBitmapBlocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t width, uint16_t height);
 static void DMA2D_wait_until_finished();
 
 static void swap_buffers();
 static void on_blanking_event();
-static __IO int can_start_draw = 0;
 
 
 static __IO uint32_t last_ltdc_line_event_us;
@@ -58,7 +57,23 @@ static __IO int lcd_refresh_divider_counter = 0;
 static on_vsync_t on_vsync_handle;
 static wait_until_vsync_t wait_until_vsync_handle;
 #define IS_EXTERNAL_VSYNC_CTRL() (on_vsync_handle && wait_until_vsync_handle)
+static __IO int can_start_draw = 0;
 
+static on_nonblocking_draw_finish_t on_nonblocking_draw_finish_handle;
+static wait_until_nonblocking_draw_finish_t wait_until_nonblocking_draw_finish_handle;
+#define IS_EXTERNAL_DRAW_CTRL() (on_nonblocking_draw_finish_handle && wait_until_nonblocking_draw_finish_handle)
+static __IO int dma2d_busy = 0;
+
+
+static void DMA2D_transfer_complete(DMA2D_HandleTypeDef* dma2d_handle) {
+	UNUSED(dma2d_handle);
+	if(IS_EXTERNAL_DRAW_CTRL()) {
+		on_nonblocking_draw_finish_handle();
+	}
+	else {
+		dma2d_busy = 0;
+	}
+}
 
 bsp_result_t lcd_dsi_init() {
 	if(SetPanelConfig() != 0) {
@@ -69,6 +84,7 @@ bsp_result_t lcd_dsi_init() {
 	HAL_LTDC_ProgramLineEvent(&hltdc, LOCATION_BACKPORCH);
 	last_ltdc_line_event_us = microtimer_get_us();
 	can_start_draw = 0;
+	dma2d_busy = 0;
 	lcd_refresh_divider_counter = 0;
 
 	return BSP_OK;
@@ -228,45 +244,15 @@ void lcd_dsi_set_vsync_ctrl(on_vsync_t on_vsync, wait_until_vsync_t wait_until_v
 	wait_until_vsync_handle = wait_until_vsync;
 }
 
-
-void lcd_dsi_draw_fillrect(uint32_t x_pos, uint32_t y_pos, uint32_t width, uint32_t height, uint32_t color) {
-	DMA2D_FillRectBlocking(color, x_pos, y_pos, width, height);
-}
-
-static void DMA2D_FillRectBlocking(uint32_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-	DMA2D_FillRectNonblocking(color, x, y, width, height);
-	DMA2D_wait_until_finished();
-}
-
-static void DMA2D_FillRectNonblocking(uint32_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-	hdma2d.Init.Mode = DMA2D_R2M;
-	hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
-	hdma2d.Init.OutputOffset = PIXEL_PERLINE - width;
-	HAL_StatusTypeDef ret = HAL_OK;
-	ret = HAL_DMA2D_Init(&hdma2d);
-	if(ret != HAL_OK) {
+void lcd_dsi_set_draw_ctrl(on_nonblocking_draw_finish_t on_nonblocking_draw_finish, wait_until_nonblocking_draw_finish_t wait_until_nonblocking_draw_finish) {
+	if(!on_nonblocking_draw_finish || !wait_until_nonblocking_draw_finish) {
 		Error_Handler();
 	}
 
-	ret = HAL_DMA2D_Start(
-		&hdma2d,
-		color,
-		back_buffer_address + 4 * (y * PIXEL_PERLINE + x),
-		width,
-		height
-	);
-	if(ret != HAL_OK) {
-		Error_Handler();
-	}
+	on_nonblocking_draw_finish_handle = on_nonblocking_draw_finish;
+	wait_until_nonblocking_draw_finish_handle = wait_until_nonblocking_draw_finish;
 }
 
-static void DMA2D_wait_until_finished() {
-	HAL_StatusTypeDef ret = HAL_OK;
-	ret = HAL_DMA2D_PollForTransfer(&hdma2d, 100);
-	if(ret != HAL_OK) {
-		Error_Handler();
-	}
-}
 
 void lcd_dsi_wait_until_vsync() {
 	if(IS_EXTERNAL_VSYNC_CTRL()) {
@@ -281,18 +267,31 @@ void lcd_dsi_wait_until_vsync() {
 }
 
 
-void lcd_dsi_clearscreen(uint32_t color) {
-	ltdc_clear_sreen_start_us = microtimer_get_us();
+static void DMA2D_FillRectBlocking(uint32_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	hdma2d.Init.Mode = DMA2D_R2M;
+	hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
+	hdma2d.Init.OutputOffset = PIXEL_PERLINE - width;
+	hdma2d.XferCpltCallback = DMA2D_transfer_complete;
+	HAL_StatusTypeDef ret = HAL_OK;
+	ret = HAL_DMA2D_Init(&hdma2d);
+	if(ret != HAL_OK) {
+		Error_Handler();
+	}
 
-	/* Clear screen nonblocking */
-	DMA2D_FillRectNonblocking(color, 0, 0, LCD_WIDTH, LCD_HEIGHT);
-
+	ret = HAL_DMA2D_Start_IT(
+		&hdma2d,
+		color,
+		back_buffer_address + 4 * (y * PIXEL_PERLINE + x),
+		width,
+		height
+	);
+	if(ret != HAL_OK) {
+		Error_Handler();
+	}
 	DMA2D_wait_until_finished();
-	ltdc_clear_sreen_duriation_us = microtimer_get_us() - ltdc_clear_sreen_start_us;
 }
 
-
-void lcd_dsi_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+static void DMA2D_DrawBitmapBlocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
 	uint32_t destination = back_buffer_address + (y * PIXEL_PERLINE + x) * 4;
 	uint32_t source      = (uint32_t)pSrc;
 
@@ -300,14 +299,14 @@ void lcd_dsi_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16
 	hdma2d.Init.Mode         = DMA2D_M2M;
 	hdma2d.Init.ColorMode    = DMA2D_OUTPUT_ARGB8888;
 	hdma2d.Init.OutputOffset = PIXEL_PERLINE - width;
-
+	hdma2d.XferCpltCallback = DMA2D_transfer_complete;
 	HAL_StatusTypeDef ret = HAL_OK;
 	ret = HAL_DMA2D_Init(&hdma2d);
 	if(ret != HAL_OK) {
 		Error_Handler();
 	}
 
-	ret = HAL_DMA2D_Start(
+	ret = HAL_DMA2D_Start_IT(
 		&hdma2d,
 		source,
 		destination,
@@ -317,25 +316,45 @@ void lcd_dsi_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16
 	if(ret != HAL_OK) {
 		Error_Handler();
 	}
-
 	DMA2D_wait_until_finished();
+}
 
+static void DMA2D_wait_until_finished() {
+	if(IS_EXTERNAL_DRAW_CTRL()) {
+		wait_until_nonblocking_draw_finish_handle();
+	}
+	else {
+		while(dma2d_busy != 0) {
+			;
+		}
+		dma2d_busy = 1;
+	}
+//	on_nonblocking_draw_start_handle();
 
-	/*##-2- DMA2D Callbacks Configuration ######################################*/
-//	hdma2d.XferCpltCallback  = NULL;
-	/*##-3- Foreground Configuration ###########################################*/
-//	hdma2d.LayerCfg[1].AlphaMode = DMA2D_NO_MODIF_ALPHA;
-//	hdma2d.LayerCfg[1].InputAlpha = 0xFF;
-//	hdma2d.LayerCfg[1].InputColorMode = DMA2D_INPUT_ARGB8888;
-//	hdma2d.LayerCfg[1].InputOffset = 0;
-//	hdma2d.Instance          = DMA2D;
-//	if(HAL_DMA2D_ConfigLayer(&hdma2d, 1) == HAL_OK) {
-//		if (HAL_DMA2D_Start(&hdma2d, source, destination, xsize, ysize) == HAL_OK) {
-//			/* Polling For DMA transfer */
-//			HAL_DMA2D_PollForTransfer(&hdma2d, 100);
-//		}
+//	HAL_StatusTypeDef ret = HAL_OK;
+//	ret = HAL_DMA2D_PollForTransfer(&hdma2d, 100);
+//	if(ret != HAL_OK) {
+//		Error_Handler();
 //	}
+}
 
+/* Tools */
+
+void lcd_dsi_clearscreen(uint32_t color) {
+	ltdc_clear_sreen_start_us = microtimer_get_us();
+
+	/* Clear screen nonblocking */
+	DMA2D_FillRectBlocking(color, 0, 0, LCD_WIDTH, LCD_HEIGHT);
+
+	ltdc_clear_sreen_duriation_us = microtimer_get_us() - ltdc_clear_sreen_start_us;
+}
+
+void lcd_dsi_draw_fillrect(uint32_t x_pos, uint32_t y_pos, uint32_t width, uint32_t height, uint32_t color) {
+	DMA2D_FillRectBlocking(color, x_pos, y_pos, width, height);
+}
+
+void lcd_dsi_draw_bitmap_blocking(uint32_t *pSrc, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+	DMA2D_DrawBitmapBlocking(pSrc, x, y, width, height);
 }
 
 void lcd_dsi_draw_hline(uint32_t x1, uint32_t x2, uint32_t y, uint32_t color) {
@@ -357,4 +376,21 @@ void lcd_dsi_draw_vline(uint32_t y1, uint32_t y2, uint32_t x, uint32_t color) {
 		*(__IO uint32_t *)(destination) = color;
 	}
 }
+
+
+
+/*##-2- DMA2D Callbacks Configuration ######################################*/
+//	hdma2d.XferCpltCallback  = NULL;
+/*##-3- Foreground Configuration ###########################################*/
+//	hdma2d.LayerCfg[1].AlphaMode = DMA2D_NO_MODIF_ALPHA;
+//	hdma2d.LayerCfg[1].InputAlpha = 0xFF;
+//	hdma2d.LayerCfg[1].InputColorMode = DMA2D_INPUT_ARGB8888;
+//	hdma2d.LayerCfg[1].InputOffset = 0;
+//	hdma2d.Instance          = DMA2D;
+//	if(HAL_DMA2D_ConfigLayer(&hdma2d, 1) == HAL_OK) {
+//		if (HAL_DMA2D_Start(&hdma2d, source, destination, xsize, ysize) == HAL_OK) {
+//			/* Polling For DMA transfer */
+//			HAL_DMA2D_PollForTransfer(&hdma2d, 100);
+//		}
+//	}
 

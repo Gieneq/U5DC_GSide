@@ -9,11 +9,14 @@ extern uint32_t lcd_dsi_framebuffer1[LCD_DSI_FRAMEBUFFER1_SIZE];
 
 typedef void (*on_vsync_t)();
 typedef void (*wait_until_vsync_t)();
+typedef void (*on_nonblocking_draw_finish_t)();
+typedef void (*wait_until_nonblocking_draw_finish_t)();
 
 bsp_result_t lcd_dsi_init();
 
 /* Controls */
 void lcd_dsi_set_vsync_ctrl(on_vsync_t on_vsync, wait_until_vsync_t wait_until_vsync);
+void lcd_dsi_set_draw_ctrl(on_nonblocking_draw_finish_t on_nonblocking_draw_finish, wait_until_nonblocking_draw_finish_t wait_until_nonblocking_draw_finish);
 void lcd_dsi_wait_until_vsync();
 
 /* Tools */
